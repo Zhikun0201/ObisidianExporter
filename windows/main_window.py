@@ -1,5 +1,6 @@
 ﻿import os
 import re
+import subprocess
 import sys
 
 from PySide6.QtCore import Qt, QDir, QSettings, QFileInfo, QDirIterator, QCoreApplication
@@ -8,6 +9,11 @@ from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QSplitter, 
     QListWidget, QListWidgetItem, QCheckBox, QMessageBox
 import pypandoc
 
+if hasattr(sys, '_MEIPASS'):
+    # PyInstaller 在打包后，_MEIPASS 指向临时解压/运行目录
+    base_path = sys._MEIPASS
+    pandoc_path = os.path.join(base_path, 'pandoc/pandoc')
+    pypandoc.__pandoc_path = pandoc_path
 
 class MainWindow(QMainWindow):
 
@@ -260,36 +266,34 @@ class MainWindow(QMainWindow):
         self.__refresh_preview()
 
     def __export_word(self):
-        _file_dialog = QFileDialog(self, "选择导出 Word 的位置")
-        _file_dialog.setFileMode(QFileDialog.FileMode.AnyFile)
-        _file_dialog.setNameFilter("Word (*.docx)")
-        if _file_dialog.exec():
-            _selected_files = _file_dialog.selectedFiles()
-            if _selected_files:
-                _output_path = _selected_files[0]
-                if not _output_path.endswith(".docx"):
-                    _output_path += ".docx"
-                if convert_markdown_to_word(self.preview.toMarkdown(), _output_path):
-                    if QMessageBox.information(self, "导出 Word", "导出 Word 成功！是否打开？",
-                                               QMessageBox.StandardButton.Yes,
-                                               QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-                        os.startfile(_output_path)
+        _saved_file, _ = QFileDialog(self, "选择导出 Word 的位置").getSaveFileName()
+        if _saved_file:
+            if not _saved_file.endswith(".docx"):
+                _saved_file += ".docx"
+            if convert_markdown_to_word(self.preview.toMarkdown(), _saved_file):
+                if QMessageBox.information(self, "导出 Word", "导出 Word 成功！是否打开？",
+                                           QMessageBox.StandardButton.Yes,
+                                           QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+                    if sys.platform == "win32":
+                        os.startfile(_saved_file)
+                    else:
+                        opener = "open" if sys.platform == "darwin" else "xdg-open"
+                        subprocess.call([opener, _saved_file])
 
     def __export_markdown(self):
-        _file_dialog = QFileDialog(self, "选择导出 Markdown 的位置")
-        _file_dialog.setFileMode(QFileDialog.FileMode.AnyFile)
-        _file_dialog.setNameFilter("Markdown (*.md)")
-        if _file_dialog.exec():
-            _selected_files = _file_dialog.selectedFiles()
-            if _selected_files:
-                _output_path = _selected_files[0]
-                if not _output_path.endswith(".md"):
-                    _output_path += ".md"
-                if save_markdown_file(self.preview.toMarkdown(), _output_path):
-                    if QMessageBox.information(self, "导出 Markdown", "导出 Markdown 成功！是否打开？",
-                                               QMessageBox.StandardButton.Yes,
-                                               QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-                        os.startfile(_output_path)
+        _saved_file, _ = QFileDialog(self, "选择导出 Markdown 的位置").getSaveFileName()
+        if _saved_file:
+            if not _saved_file.endswith(".md"):
+                _saved_file += ".md"
+            if save_markdown_file(self.preview.toMarkdown(), _saved_file):
+                if QMessageBox.information(self, "导出 Markdown", "导出 Markdown 成功！是否打开？",
+                                           QMessageBox.StandardButton.Yes,
+                                           QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+                    if sys.platform == "win32":
+                        os.startfile(_saved_file)
+                    else:
+                        opener = "open" if sys.platform == "darwin" else "xdg-open"
+                        subprocess.call([opener, _saved_file])
 
     def __refresh_preview(self):
         files = []
@@ -419,6 +423,8 @@ def extract_section(markdown_text, target_header):
 
 # Markdown 转 Word
 def convert_markdown_to_word(markdown_content, output_path):
+    if pypandoc.get_pandoc_path() is None:
+        pypandoc.download_pandoc()
     markdown_content = markdown_content.replace("- - -", "")
     pypandoc.convert_text(markdown_content, "docx", format="md", outputfile=output_path)
     return True

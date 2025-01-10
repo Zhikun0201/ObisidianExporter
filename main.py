@@ -1,9 +1,12 @@
-﻿import sys
+﻿import os
+import sys
 
-from PySide6.QtCore import Qt, QSettings, QCoreApplication
+from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 from windows.main_window import MainWindow
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
